@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  User2,
+  Briefcase,
   Code,
   Database,
   Cloud,
@@ -10,170 +12,439 @@ import {
   Globe,
   Phone,
   GitBranch,
-  Save,
-  FileText,
+  Heart,
+  MessageCircle,
+  Share2,
+  Send,
+  ArrowLeft,
+  ArrowRight,
+  Info,
 } from 'lucide-react'
 
-function SkillBadge({ icon: Icon, label }) {
-  return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 shadow-sm hover:shadow transition-shadow">
-      <Icon className="w-4 h-4 text-gray-700" />
-      <span className="text-sm font-semibold text-gray-800">{label}</span>
-    </div>
-  )
+function cn(...classes) {
+  return classes.filter(Boolean).join(' ')
 }
 
-function ProjectItem({ icon: Icon, title, desc }) {
+// Mini helpers
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
+
+// Skill badge (interactive)
+function SkillBadge({ icon: Icon, label, onClick, active = false }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors">
+    <button
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold shadow-sm transition-all',
+        active
+          ? 'bg-gray-900 text-white border-gray-900'
+          : 'bg-white/85 text-gray-800 border-gray-200 hover:bg-white'
+      )}
+      aria-pressed={active}
+    >
+      <Icon className={cn('w-4 h-4', active ? 'text-white' : 'text-gray-700')} />
+      <span>{label}</span>
+    </button>
+  )}
+
+function ProjectItem({ icon: Icon, title, desc, linkLabel = 'Expand', onExpand }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-white/75 hover:bg-white transition-colors">
       <div className="mt-0.5">
         <Icon className="w-5 h-5 text-gray-700" />
       </div>
-      <div>
+      <div className="flex-1">
         <p className="text-sm font-bold text-gray-900">{title}</p>
         <p className="text-sm text-gray-600 leading-snug">{desc}</p>
+      </div>
+      <button
+        onClick={onExpand}
+        className="text-xs font-bold text-gray-700 hover:text-gray-900 inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-200 bg-white hover:shadow"
+      >
+        <Info className="w-3.5 h-3.5" /> {linkLabel}
+      </button>
+    </div>
+  )
+}
+
+function Availability({ level, setLevel }) {
+  const pct = (level / 9) * 100
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold tracking-wide text-red-600">Hot Availability</span>
+        <span className="text-xs font-black text-gray-900 bg-red-50 border border-red-200 rounded px-2 py-0.5">{level}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-red-100 overflow-hidden border border-red-200">
+        <div
+          className="h-full bg-gradient-to-r from-rose-400 to-amber-400 transition-all"
+          style={{ width: pct + '%' }}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          aria-label="decrease"
+          onClick={() => setLevel((v) => clamp(v - 1, 0, 9))}
+          className="w-7 h-7 grid place-items-center rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          −
+        </button>
+        <button
+          aria-label="increase"
+          onClick={() => setLevel((v) => clamp(v + 1, 0, 9))}
+          className="w-7 h-7 grid place-items-center rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          +
+        </button>
       </div>
     </div>
   )
 }
 
-export default function App() {
-  const [availability, setAvailability] = useState(3)
+function EngagementBar({ likes, comments, onLike, onCommentToggle, onShare, onDM }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onLike}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 font-semibold text-sm"
+        >
+          <Heart className="w-4 h-4 text-rose-500" /> Like
+        </button>
+        <button
+          onClick={onCommentToggle}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 font-semibold text-sm"
+        >
+          <MessageCircle className="w-4 h-4 text-indigo-600" /> Comment
+        </button>
+        <button
+          onClick={onShare}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 font-semibold text-sm"
+        >
+          <Share2 className="w-4 h-4 text-emerald-600" /> Share
+        </button>
+        <button
+          onClick={onDM}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 font-semibold text-sm"
+        >
+          <Send className="w-4 h-4 text-gray-700" /> DM
+        </button>
+      </div>
+      <div className="mt-2 text-xs text-gray-600">
+        <span className="font-bold">{likes}</span> likes • <span className="font-bold">{comments}</span> comments
+      </div>
+    </div>
+  )
+}
 
+function Card({ profile }) {
+  const [activeSkill, setActiveSkill] = useState(null)
+  const [expanded, setExpanded] = useState(false)
+  const [availability, setAvailability] = useState(3)
+  const [likes, setLikes] = useState(Math.floor(Math.random() * 80) + 20)
+  const [comments, setComments] = useState(Math.floor(Math.random() * 25) + 2)
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [commentText, setCommentText] = useState('')
+
+  // Auto increment availability
   useEffect(() => {
     const id = setInterval(() => {
-      setAvailability((prev) => {
-        const next = prev + (Math.random() > 0.6 ? 1 : 0)
-        return Math.min(9, next)
-      })
+      setAvailability((v) => clamp(v + (Math.random() > 0.6 ? 1 : 0), 0, 9))
     }, 4000)
     return () => clearInterval(id)
   }, [])
 
+  const onAddComment = () => {
+    const text = commentText.trim()
+    if (!text) return
+    setComments((c) => c + 1)
+    setCommentText('')
+    setShowCommentBox(false)
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100/60 text-gray-900 relative">
-      {/* Board Container */}
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <div className="relative rounded-2xl border border-gray-200 bg-white/80 backdrop-blur shadow-sm overflow-hidden">
-          {/* Corner certification stickers */}
-          <div className="absolute right-3 top-3 flex gap-2">
-            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-              <Award className="w-3.5 h-3.5" /> AWS Cert
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm">
-              <Shield className="w-3.5 h-3.5" /> Security+
-            </span>
+    <div className="relative rounded-2xl border border-gray-200 bg-white/85 backdrop-blur shadow-sm overflow-hidden p-6 md:p-8">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-gray-900">
+            <User2 className="w-6 h-6" />
+            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">{profile.name}</h2>
           </div>
-
-          {/* Header */}
-          <div className="px-8 pt-10 pb-6">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">
-              Alex Johnson
-            </h1>
-            <p className="mt-2 text-lg md:text-xl font-bold text-gray-700">
-              Senior Full‑Stack Engineer
-            </p>
-
-            {/* Skills */}
-            <div className="mt-6 flex flex-wrap gap-2">
-              <SkillBadge icon={Code} label="TypeScript" />
-              <SkillBadge icon={Database} label="MongoDB" />
-              <SkillBadge icon={Cloud} label="AWS" />
-              <SkillBadge icon={GitBranch} label="CI/CD" />
-              <SkillBadge icon={Shield} label="Auth & Security" />
-            </div>
-          </div>
-
-          {/* Body */}
-          <div className="px-8 pb-8 grid md:grid-cols-5 gap-6">
-            {/* Left column: Projects */}
-            <div className="md:col-span-3 space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-600">Projects</h2>
-              <ProjectItem
-                icon={Folder}
-                title="Realtime Collaboration Suite"
-                desc="Built a WebSocket-based document editor with presence, comments, and role-based access. Reduced sync conflicts by 40%."
+          <p className="mt-1 text-base md:text-lg font-bold text-gray-700 flex items-center gap-2">
+            <Briefcase className="w-4 h-4" /> {profile.title}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {profile.skills.map((s) => (
+              <SkillBadge
+                key={s.label}
+                icon={s.icon}
+                label={s.label}
+                active={activeSkill === s.label}
+                onClick={() => setActiveSkill(activeSkill === s.label ? null : s.label)}
               />
-              <ProjectItem
-                icon={Globe}
-                title="Global E‑commerce Platform"
-                desc="Led migration to micro frontends, introduced edge caching and A/B infra—cut TTFB by 35% across regions."
-              />
-              <ProjectItem
-                icon={Phone}
-                title="Mobile Health Dashboard"
-                desc="Created offline‑first PWA with secure sync, charts, and notifications. HIPAA‑aligned data flows."
-              />
-            </div>
-
-            {/* Right column: Highlights */}
-            <div className="md:col-span-2 space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-600">Highlights</h2>
-              <div className="rounded-lg border border-gray-200 bg-white/70 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-amber-500" />
-                  <p className="text-sm font-semibold text-gray-800">10+ years experience</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Database className="w-4 h-4 text-gray-700 mt-0.5" />
-                  <p className="text-sm text-gray-700">Designed multi‑tenant data models and analytics pipelines for 100k+ MAU.</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Cloud className="w-4 h-4 text-gray-700 mt-0.5" />
-                  <p className="text-sm text-gray-700">Infra as code, autoscaling, and cost monitoring across AWS.</p>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-1">
-                <button className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-gray-900 text-white font-bold text-sm shadow hover:shadow-md hover:bg-black transition-all">
-                  <Save className="w-4 h-4" /> Save Talent
-                </button>
-                <button className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white font-bold text-sm text-gray-900 border border-gray-300 shadow-sm hover:shadow hover:translate-y-[-1px] transition-all">
-                  <FileText className="w-4 h-4" /> Request Resume
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-
-          {/* Footer hint */}
-          <div className="px-8 pb-8">
-            <div className="text-xs text-gray-500">
-              References available upon request • Open to remote and hybrid roles
+          {activeSkill && (
+            <div className="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <span className="font-bold">{activeSkill}:</span> {profile.skillDetails[activeSkill] || 'No additional details.'}
             </div>
-          </div>
+          )}
+        </div>
+        <div className="w-44">
+          <Availability level={availability} setLevel={setAvailability} />
         </div>
       </div>
 
-      {/* Hot Availability counter */}
-      <div className="fixed bottom-6 right-6">
-        <div className="flex items-center gap-3 rounded-full border border-red-200 bg-white/90 backdrop-blur px-4 py-2 shadow-lg">
-          <div className="flex -space-x-2">
-            <span className="w-6 h-6 rounded-full bg-red-100 border border-white" />
-            <span className="w-6 h-6 rounded-full bg-orange-100 border border-white" />
-            <span className="w-6 h-6 rounded-full bg-rose-100 border border-white" />
-          </div>
-          <span className="text-sm font-extrabold text-red-600 tracking-wide">Hot Availability</span>
-          <span className="text-sm font-black text-gray-900 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-            {availability}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              aria-label="decrease"
-              onClick={() => setAvailability((v) => Math.max(0, v - 1))}
-              className="w-6 h-6 grid place-items-center rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              −
-            </button>
-            <button
-              aria-label="increase"
-              onClick={() => setAvailability((v) => Math.min(9, v + 1))}
-              className="w-6 h-6 grid place-items-center rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              +
-            </button>
-          </div>
+      {/* Projects */}
+      <div className="mt-6">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-600">Projects</h3>
+        <div className="mt-3 space-y-3">
+          {profile.projects.slice(0, expanded ? profile.projects.length : 2).map((p) => (
+            <ProjectItem key={p.title} icon={p.icon} title={p.title} desc={p.desc} onExpand={() => setExpanded((e) => !e)} linkLabel={expanded ? 'Collapse' : 'Expand'} />
+          ))}
         </div>
+      </div>
+
+      {/* Certifications */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {profile.certifications.map((c) => (
+          <button
+            key={c}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:shadow-sm"
+            onClick={() => alert(c)}
+          >
+            <Award className="w-3.5 h-3.5" /> {c}
+          </button>
+        ))}
+      </div>
+
+      {/* Engagement */}
+      <div className="mt-6">
+        <EngagementBar
+          likes={likes}
+          comments={comments}
+          onLike={() => setLikes((l) => l + 1)}
+          onCommentToggle={() => setShowCommentBox((s) => !s)}
+          onShare={() => navigator.clipboard.writeText(window.location.href)}
+          onDM={() => alert('DM sent to poster!')}
+        />
+        {showCommentBox && (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Write a comment..."
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+            />
+            <button
+              onClick={onAddComment}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white text-sm font-semibold hover:bg-black"
+            >
+              <Send className="w-4 h-4" /> Post
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Carousel({ items, renderItem }) {
+  const [index, setIndex] = useState(0)
+  const trackRef = useRef(null)
+  const startX = useRef(0)
+  const currentX = useRef(0)
+  const dragging = useRef(false)
+
+  const go = (dir) => setIndex((i) => clamp(i + dir, 0, items.length - 1))
+  const to = (i) => setIndex(clamp(i, 0, items.length - 1))
+
+  // Keyboard nav
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') go(1)
+      if (e.key === 'ArrowLeft') go(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Touch/drag
+  const onPointerDown = (e) => {
+    dragging.current = true
+    startX.current = 'touches' in e ? e.touches[0].clientX : e.clientX
+    currentX.current = startX.current
+  }
+  const onPointerMove = (e) => {
+    if (!dragging.current) return
+    currentX.current = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const dx = currentX.current - startX.current
+    if (trackRef.current) {
+      trackRef.current.style.transform = `translateX(${dx - index * 100}%)`
+    }
+  }
+  const onPointerUp = () => {
+    if (!dragging.current) return
+    const dx = currentX.current - startX.current
+    dragging.current = false
+    if (Math.abs(dx) > 60) {
+      if (dx < 0) go(1)
+      else go(-1)
+    } else {
+      to(index)
+    }
+    if (trackRef.current) {
+      trackRef.current.style.transform = ''
+    }
+  }
+
+  return (
+    <div className="relative select-none">
+      <div className="overflow-hidden rounded-2xl" onMouseLeave={onPointerUp}>
+        <div
+          ref={trackRef}
+          className="flex transition-transform duration-300"
+          style={{ transform: `translateX(-${index * 100}%)` }}
+          onMouseDown={onPointerDown}
+          onMouseMove={onPointerMove}
+          onMouseUp={onPointerUp}
+          onTouchStart={onPointerDown}
+          onTouchMove={onPointerMove}
+          onTouchEnd={onPointerUp}
+        >
+          {items.map((it, i) => (
+            <div key={i} className="min-w-full p-2 sm:p-4">
+              {renderItem(it)}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Controls */}
+      <button
+        aria-label="Previous"
+        onClick={() => go(-1)}
+        className="absolute left-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-full bg-white/90 border border-gray-200 shadow hover:bg-white"
+      >
+        <ArrowLeft className="w-4 h-4" />
+      </button>
+      <button
+        aria-label="Next"
+        onClick={() => go(1)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-full bg-white/90 border border-gray-200 shadow hover:bg-white"
+      >
+        <ArrowRight className="w-4 h-4" />
+      </button>
+
+      {/* Dots */}
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {items.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => to(i)}
+            className={cn(
+              'w-2.5 h-2.5 rounded-full border border-gray-300',
+              i === index ? 'bg-gray-900 border-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+            )}
+            aria-label={`Go to slide ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Demo data
+const profiles = [
+  {
+    name: 'Alex Johnson',
+    title: 'Senior Full‑Stack Engineer',
+    skills: [
+      { icon: Code, label: 'TypeScript' },
+      { icon: Database, label: 'MongoDB' },
+      { icon: Cloud, label: 'AWS' },
+      { icon: GitBranch, label: 'CI/CD' },
+      { icon: Shield, label: 'Security' },
+    ],
+    skillDetails: {
+      TypeScript: '5+ years, React, Node, tRPC, Zod, advanced types.',
+      MongoDB: 'Schema design, indexes, aggregation pipelines, Atlas.',
+      AWS: 'EC2, Lambda, API Gateway, CloudFront, S3, CDK.',
+      'CI/CD': 'GitHub Actions, semantic releases, feature flags.',
+      Security: 'AuthN/Z, JWT, OAuth, OWASP, Secrets mgmt.',
+    },
+    projects: [
+      { icon: Folder, title: 'Realtime Collaboration Suite', desc: 'WebSocket editor with presence and RBAC. −40% conflicts.' },
+      { icon: Globe, title: 'Global E‑commerce Platform', desc: 'Edge caching, microfrontends, −35% TTFB.' },
+      { icon: Phone, title: 'Mobile Health Dashboard', desc: 'Offline‑first PWA, secure sync, notifications.' },
+    ],
+    certifications: ['AWS Solutions Architect', 'Security+'],
+  },
+  {
+    name: 'Priya Sharma',
+    title: 'ML Engineer',
+    skills: [
+      { icon: Code, label: 'Python' },
+      { icon: Database, label: 'Vector DB' },
+      { icon: Cloud, label: 'GCP' },
+      { icon: Star, label: 'MLOps' },
+      { icon: Shield, label: 'Compliance' },
+    ],
+    skillDetails: {
+      Python: 'NLP, LLM finetuning, Torch, JAX basics.',
+      'Vector DB': 'FAISS, Pinecone, hybrid search, evals.',
+      GCP: 'Vertex AI, Dataflow, BigQuery, Cloud Run.',
+      MLOps: 'ML pipelines, model registry, drift, CI/CD.',
+      Compliance: 'PII handling, HIPAA workflows, audit logs.',
+    },
+    projects: [
+      { icon: Folder, title: 'RAG Service', desc: 'Multi-tenant RAG, cached reranking, citations.' },
+      { icon: Globe, title: 'Forecasting Platform', desc: 'XGBoost + Prophet ensemble for demand.' },
+      { icon: Phone, title: 'On-device Model', desc: 'Quantized mobile model with NNAPI.' },
+    ],
+    certifications: ['TensorFlow Developer', 'GCP Professional ML'],
+  },
+  {
+    name: 'Diego Martínez',
+    title: 'Frontend Engineer',
+    skills: [
+      { icon: Code, label: 'React' },
+      { icon: Database, label: 'State Mgmt' },
+      { icon: Cloud, label: 'Vite' },
+      { icon: Star, label: 'Animations' },
+      { icon: Shield, label: 'Accessibility' },
+    ],
+    skillDetails: {
+      React: 'Hooks, Suspense, SSR, performance budget.',
+      'State Mgmt': 'Zustand, Redux Toolkit, RTK Query.',
+      Vite: 'HMR, code-splitting, env, plugins.',
+      Animations: 'Framer Motion, spring configs, micro-interactions.',
+      Accessibility: 'ARIA patterns, focus mgmt, keyboard nav.',
+    },
+    projects: [
+      { icon: Folder, title: 'Design System', desc: 'Atomic components, tokens, docs site.' },
+      { icon: Globe, title: 'Marketing Hub', desc: 'A/B tests, lighthouse 95+, i18n.' },
+      { icon: Phone, title: 'Finance App', desc: 'Charts, offline mode, PWA.' },
+    ],
+    certifications: ['WAI-ARIA Practitioner', 'Scrum Master'],
+  },
+]
+
+export default function App() {
+  const items = useMemo(() => profiles, [])
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100/60 text-gray-900">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">T‑Board Feed</h1>
+          <p className="mt-1 text-gray-600">Swipe through curated resumes and job listings. Engage directly with each post.</p>
+        </div>
+
+        <Carousel
+          items={items}
+          renderItem={(p) => <Card profile={p} />}
+        />
       </div>
     </div>
   )
